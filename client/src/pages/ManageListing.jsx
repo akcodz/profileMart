@@ -1,8 +1,11 @@
 import React, {useEffect, useState} from 'react'
 import {useNavigate, useParams} from "react-router-dom";
-import {useSelector} from "react-redux";
+import {useDispatch, useSelector} from "react-redux";
 import toast from "react-hot-toast";
 import {Loader2Icon, Upload} from "lucide-react";
+import {useAuth} from "@clerk/clerk-react";
+import api from "../configs/axios.js";
+import {getAllPublicListing, getAllUserListing} from "../app/features/listingSlice.js";
 
 const ManageListing = () => {
     const {id} = useParams()
@@ -11,6 +14,9 @@ const ManageListing = () => {
 
     const [loadingListing, setLoadingListing] = useState(false)
     const [isEditing, setIsEditing] = useState(false)
+
+    const {getToken}=useAuth()
+    const dispatch = useDispatch();
 
     const [formData, setFormData] = useState({
         title: '',
@@ -89,7 +95,68 @@ const ManageListing = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-    }
+        toast.loading("saving...");
+
+        const dataCopy = structuredClone(formData);
+
+        try {
+            const token = await getToken();
+            const dataCopy=structuredClone(formData);
+            if (isEditing) {
+                dataCopy.images = formData.images.filter(
+                    (image) => typeof image === "string"
+                );
+
+                const formDataInstance = new FormData();
+                formDataInstance.append('accountDetails', JSON.stringify(dataCopy));
+
+                formData.images
+                    .filter((image) => typeof image !== "string")
+                    .forEach((image) => {
+                        formDataInstance.append('images', image);
+                    });
+
+                const token = await getToken();
+
+                const { data } = await api.put('/api/listing', formDataInstance, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                toast.dismissAll()
+                toast.success(data.message);
+                dispatch(getAllUserListing({getToken}));
+                dispatch(getAllPublicListing());
+                navigate("/my-listings");
+            }else {
+                delete dataCopy.images;
+                const formDataInstance = new FormData();
+                formDataInstance.append('accountDetails', JSON.stringify(dataCopy));
+
+                formData.images.forEach((image) => {
+                        formDataInstance.append('images', image);
+                    });
+
+                const token = await getToken();
+
+                const { data } = await api.post('/api/listing', formDataInstance, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                toast.dismissAll()
+                toast.success(data.message);
+                dispatch(getAllUserListing({getToken}));
+                dispatch(getAllPublicListing());
+                navigate("/my-listings");
+            }
+
+
+
+        } catch (error) {
+            toast.dismissAll();
+            toast.error(error?.response?.data?.message || error.message);
+        }
+    };
+
+
+
     if (loadingListing) {
         return (
             <div className='h-screen flex items-center justify-center'>

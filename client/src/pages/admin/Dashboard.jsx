@@ -4,9 +4,14 @@ import { useState } from 'react';
 import { useEffect } from 'react';
 import ListingDetailsModal from '../../components/admin/ListingDetailsModal';
 import { dummyListings } from '../../assets/assets.jsx';
+import {useAuth, useUser} from "@clerk/clerk-react";
+import api from "../../configs/axios.js";
+import toast from "react-hot-toast";
 
 const Dashboard = () => {
     const currency = import.meta.env.VITE_CURRENCY || '$';
+    const user = useUser()
+    const {getToken} = useAuth();
 
     const [loading, setLoading] = useState(true);
     const [dashboardData, setDashboardData] = useState({
@@ -22,23 +27,38 @@ const Dashboard = () => {
         { title: 'Total Listings', value: dashboardData.totalListings || '0', icon: ChartLineIcon },
         { title: 'Total Revenue', value: currency + dashboardData.totalRevenue.toLocaleString() || '0', icon: CircleDollarSignIcon },
         { title: 'Active Listings', value: dashboardData.activeListings || '0', icon: ListIcon },
-        { title: 'Total Users', value: dashboardData.totalUser || '0', icon: UsersIcon },
+        { title: 'Total Users', value: dashboardData.totalUsers || '0', icon: UsersIcon },
     ];
 
     const fetchDashboardData = async () => {
-        setDashboardData({
-            totalListings: 5,
-            totalRevenue: 2980,
-            activeListings: 3,
-            totalUser: 7,
-            recentListings: dummyListings,
-        });
-        setLoading(false);
+        try {
+            const token = await getToken();
+
+            const { data } = await api.get('/api/admin/dashboard', {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+            console.log('Dashboard data', data);
+
+            setDashboardData(data.dashboardData);
+            setLoading(false);
+        } catch (error) {
+            toast.error(
+                error?.response?.data?.message || error?.message || 'An unexpected error occurred'
+            );
+            console.error(error);
+            setLoading(false);
+        }
     };
 
+
     useEffect(() => {
-        fetchDashboardData();
+        if (user) {
+            fetchDashboardData();
+        }
     }, []);
+
 
     return loading ? (
         <div className='flex items-center justify-center h-full'>

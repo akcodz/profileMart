@@ -4,14 +4,18 @@ import {MessageCircle, Search} from "lucide-react";
 import {format, isToday, isYesterday, parseISO} from "date-fns";
 import {useDispatch} from "react-redux";
 import {setChat} from "../app/features/chatSlice.js";
+import {useAuth, useUser} from "@clerk/clerk-react";
+import api from "../configs/axios.js";
+import toast from "react-hot-toast";
 
 const Messages = () => {
-    const user ={id:"user_1"}
+    const {user,isLoaded} =useUser()
+    const {getToken} = useAuth()
 
     const[chats,setChats]=useState([]);
     const[searchQuery,setSearchQuery]=useState('');
     const[loading,setLoading]=useState(false);
-const dispatch = useDispatch();
+    const dispatch = useDispatch();
     const formatTime = (dateString) => {
         if (!dateString) return;
 
@@ -28,31 +32,49 @@ const dispatch = useDispatch();
         return format(date, 'MMM d');
     };
 
-    const filteredChats = useMemo(()=>{
+    const filteredChats = useMemo(() => {
         const query = searchQuery.toLowerCase();
-        return chats.filter(chat => {
-            const chatUser=chat.chatUserId === user.id?chat?.ownerId:chat.chatUser;
-            return chat.listing?.title?.toLowerCase().includes(query) || chatUser?.name?.toLowerCase().includes(query);
-        })
-    },[chats,searchQuery]);
+
+        if (!Array.isArray(chats)) return [];
+
+        return chats.filter((chat) => {
+            const chatUser =
+                chat.chatUserId === user.id ? chat?.owner : chat?.chatUser;
+
+            return (
+                chat?.listing?.title?.toLowerCase().includes(query) ||
+                chatUser?.name?.toLowerCase().includes(query)
+            );
+        });
+    }, [chats, searchQuery]);
+
 
     const handleOpenChat = (chat) => {
         dispatch(setChat({listing:chat.listing,chatId:chat.id}));
     }
 
-    const fetchUserChats=async () => {
-        setChats(dummyChats)
-        setLoading(false);
-    }
+    const fetchUserChats=async()=>{
+        try{
+            const token=await getToken();
+            const{data}=await api.get("/api/chat/user",{headers:{Authorization:`Bearer ${token}`}});
+            setChats(data.chats);
+            setLoading(false);
+        }catch(error){
+            toast.error(error?.response?.data?.message||error.message);
+            console.log(error);
+            setLoading(false);
+        }
+    };
 
-    useEffect(() => {
-        fetchUserChats()
-        const interval = setInterval(() => {
-            fetchUserChats()
-        },10*1000   )
 
-        return () => clearInterval(interval);
-    },[])
+    useEffect(()=>{
+        if(user&&isLoaded){
+            fetchUserChats();
+            const interval=setInterval(fetchUserChats,10000);
+            return()=>clearInterval(interval);
+        }
+    },[user,isLoaded]);
+
     return (
         <div className='mx-auto min-h-screen px-6 md:px-16 lg:px-24 xl:px-32'>
             <div className='py-10'>

@@ -1,5 +1,5 @@
 import React, {useState} from 'react'
-import {useSelector} from "react-redux";
+import {useDispatch, useSelector} from "react-redux";
 import {useNavigate} from "react-router-dom";
 import {
     ArrowDownCircleIcon, BanIcon,
@@ -16,22 +16,28 @@ import StatCard from "../components/StatCard.jsx";
 import {platformIcons} from "../assets/assets.jsx";
 import CredentialSubmission from "../components/CredentialSubmission.jsx";
 import WithdrawModel from "../components/WithdrawModel.jsx";
+import {useAuth} from "@clerk/clerk-react";
+import toast from "react-hot-toast";
+import api from "../configs/axios.js";
+import {getAllPublicListing, getAllUserListing} from "../app/features/listingSlice.js";
 
 const MyListings = () => {
     const {userListings,balance} = useSelector((state) => state.listing)
     const currency = import.meta.env.VITE_CURRENCY || '$'
+    const dispatch = useDispatch();
+    const {getToken} = useAuth()
 
     const navigate = useNavigate()
-    const totalValue= userListings.reduce((sum, listing) => sum + (listing.price || 0),0)
-    const activeListings = userListings.filter((listing) => listing.status === 'active').length
-    const soldListings = userListings.filter((listing) => listing.status === 'sold').length
+    const totalValue= userListings?.reduce((sum, listing) => sum + (listing.price || 0),0)
+    const activeListings = userListings?.filter((listing) => listing.status === 'active').length
+    const soldListings = userListings?.filter((listing) => listing.status === 'sold').length
 
     const[showCredentialSubmission,setShowCredentialSubmission] = useState(null)
     const[showWithdrawal,setShowWithdrawal] = useState(null)
     const stats = [
         {
             title: "Total Listings",
-            value: userListings.length,
+            value: userListings?.length,
             color: "indigo",
             icon: <Eye className="size-6 text-indigo-600" />
         },
@@ -49,7 +55,7 @@ const MyListings = () => {
         },
         {
             title: "Total Value",
-            value: `${currency}${totalValue.toLocaleString()}`,
+            value: `${currency}${totalValue?.toLocaleString()}`,
             color: "yellow",
             icon: <DollarSign className="size-6 text-yellow-600" />
         }
@@ -94,9 +100,53 @@ const MyListings = () => {
         return num?.toString() || "0";
     }
 
-    const toggleStatus =async (listingId) => {}
-    const deletingListing =async (listingId) => {}
-    const markAsFeatured =async (listingId) => {}
+    const toggleStatus =async (listingId) => {
+        try{
+            toast.loading("Updating listing status...");
+            const token=await getToken();
+            const{data}=await api.put(`/api/listing/${listingId}/status`,{},{headers:{Authorization:`Bearer ${token}`}});
+            dispatch(getAllUserListing({getToken}));
+            dispatch(getAllPublicListing());
+            toast.dismissAll();
+            toast.success(data.message);
+        }catch(error){
+            toast.dismissAll();
+            toast.error(error?.response?.data?.message||error.message||"Unexpected error occurred.");
+        }
+
+    }
+    const deletingListing =async (listingId) => {
+        try{
+            const confirm=window.confirm("Are you sure you want to delete this listing? If credentials are changed, new credentials will be sent to your email");
+            if(!confirm)return;
+            toast.loading("Deleting listing...");
+            const token=await getToken();
+            const{data}=await api.delete(`/api/listing/${listingId}`,{headers:{Authorization:`Bearer ${token}`}});
+            dispatch(getAllUserListing({getToken}));
+            dispatch(getAllPublicListing());
+            toast.dismiss();
+            toast.success(data.message);
+        }catch(error){
+            toast.dismiss();
+            toast.error(error?.response?.data?.message||error.message);
+        }
+
+    }
+    const markAsFeatured =async (listingId) => {
+        try{
+            toast.loading("featuring listing...");
+            const token=await getToken();
+            const{data}=await api.put(`/api/listing/featured/${listingId}`,{},{headers:{Authorization:`Bearer ${token}`}});
+            dispatch(getAllUserListing({getToken}));
+            dispatch(getAllPublicListing());
+            toast.dismiss();
+            toast.success(data.message);
+        }catch(error){
+            toast.dismiss();
+            toast.error(error?.response?.data?.message||error.message);
+        }
+
+    }
     return (
         <div className="px-6 md:px-16 lg:px-24 xl:px-32 pt-8">
             {/* Header */}
@@ -154,7 +204,7 @@ const MyListings = () => {
             </div>
 {/*listings*/}
 
-            {userListings.length === 0 ? (
+            {userListings?.length === 0 || !userListings ? (
                 <div className="bg-white rounded-lg border border-gray-200 p-16 text-center">
                     <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                         <Plus className="w-8 h-8 text-gray-400" />
@@ -176,7 +226,7 @@ const MyListings = () => {
                     </button>
                 </div>
             ) : <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {userListings.map((listing) => (
+                {userListings?.map((listing) => (
                     <div
                         key={listing.id}
                         className="bg-white rounded-lg border border-gray-200 hover:shadow-lg shadow-gray-200/70 transition-shadow"

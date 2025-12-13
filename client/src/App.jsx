@@ -1,4 +1,4 @@
-import React from "react";
+import React, {useEffect} from "react";
 import { Toaster } from "react-hot-toast";
 import {Routes, Route, useLocation} from "react-router-dom";
 
@@ -19,9 +19,26 @@ import CredentialChange from "./pages/admin/CredentialChange.jsx";
 import Transactions from "./pages/admin/Transactions.jsx";
 import Withdrawal from "./pages/admin/Withdrawal.jsx";
 import AllListings from "./pages/admin/AllListings.jsx";
+import {getAllPublicListing, getAllUserListing} from "./app/features/listingSlice.js";
+import {useDispatch} from "react-redux";
+import {useAuth, useUser} from "@clerk/clerk-react";
 
 const App = () => {
     const {pathname} = useLocation();
+    const dispatch = useDispatch();
+
+    const { getToken } = useAuth();
+    const { user, isLoaded } = useUser();
+
+    useEffect(() => {
+        dispatch(getAllPublicListing());
+    }, []);
+
+    useEffect(() => {
+        if (isLoaded && user) {
+            dispatch(getAllUserListing({getToken}));
+        }
+    }, [isLoaded, user]);
     return (
         <>
             <Toaster  />
@@ -43,7 +60,7 @@ const App = () => {
 
                 <Route path="/my-orders" element={<MyOrders />} />
 
-                <Route path="/loading" element={<Loading />} />
+                <Route path="/loading/:nextUrl" element={<Loading />} />
 
                 <Route path="/admin" element={<Layout />}>
                     <Route index element={<Dashboard />} />

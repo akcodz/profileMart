@@ -1,8 +1,14 @@
 import React, {useState} from 'react'
 import toast from "react-hot-toast";
 import {CirclePlus, X} from "lucide-react";
+import {useAuth} from "@clerk/clerk-react";
+import {useDispatch} from "react-redux";
+import api from "../configs/axios.js";
+import {getAllUserListing} from "../app/features/listingSlice.js";
 
 const CredentialSubmission = ({onClose,listing}) => {
+    const {getToken} = useAuth();
+    const dispatch = useDispatch();
     const [newField,setNewField]=useState("")
     const[credentials,setCredentials]=useState([
         {type:"email",name:"Email",value:""},
@@ -15,8 +21,30 @@ const CredentialSubmission = ({onClose,listing}) => {
         setCredentials(prev=>[...prev, {type:"text",name:name,value:""}])
         setNewField("")
     }
-    const handleSubmission=(e)=>{
-e.preventDefault()
+    const handleSubmission=async (e)=>{
+        e.preventDefault()
+        try{
+            if(credentials.length===0){
+                return toast.error("Please add at least one field!");
+            }
+            for(const cred of credentials){
+                if(!cred.value){
+                    toast.error(`please fill ${cred.name} field`);
+                }
+            }
+            const confirm=window.confirm("Credential will be verified & changed post submission. Are you sure you want to submit?");
+            if(!confirm)return;
+            const token=await getToken();
+            const{data}=await api.post("/api/listing/add-credential",{credential:credentials,listingId:listing.id},{headers:{Authorization:`Bearer ${token}`}});
+            toast.success(data.message);
+            dispatch(getAllUserListing({getToken}));
+            onClose();
+
+        }catch (error){
+            toast.dismissAll()
+            toast.error(error.message);
+        }
+
     }
     return (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center sm:p-4">

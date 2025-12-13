@@ -13,9 +13,15 @@ import {
     LineChart, Calendar, Users, Eye, MapPin, ShoppingBagIcon, MessageSquareMoreIcon
 } from "lucide-react";
 import {setChat} from "../app/features/chatSlice.js";
+import {useAuth, useClerk, useUser} from "@clerk/clerk-react";
+import toast from "react-hot-toast";
+import api from "../configs/axios.js";
 
 const ListingDetails = () => {
     const navigate = useNavigate();
+    const {user,isLoaded} = useUser();
+    const {getToken}=useAuth();
+    const{openSignIn}=useClerk()
     const currency = import.meta.env.VITE_CURRENCY ||'$'
     const dispatch = useDispatch();
     const [listing, setListing] = useState(null)
@@ -26,9 +32,39 @@ const ListingDetails = () => {
     const images = listing?.images ||[]
 
 
-    const purchaseAccount=()=>{
+    const purchaseAccount = async () => {
+        try {
+            if (!user) return openSignIn();
+
+            toast.loading('Creating payment link...');
+
+            const token = await getToken();
+
+            const { data } = await api.get(
+                `/api/listing/purchase-account/${listing.id}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            toast.dismissAll();
+            window.location.href = data.paymentLink;
+        } catch (error) {
+            toast.dismissAll();
+            toast.error(
+                error?.response?.data?.message || error?.message || 'An unexpected error occurred'
+            );
+            console.error(error);
+        }
+    };
+
+    const loadChatbox=()=>{
+        if(!user || !isLoaded)return toast('Please login to chat ')
+        if(listing.ownerId===user.id) return toast('you cannot chat within your own listing')
+        dispatch(setChat({listing:listing}))
     }
-    const loadChatbox=()=>{dispatch(setChat({listing:listing}))}
     useEffect(() => {
         const listing = listings.find((item) => item.id === listingId);
 

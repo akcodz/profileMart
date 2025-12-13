@@ -2,21 +2,36 @@ import React, {useEffect, useState} from 'react'
 import {dummyOrders, platformIcons} from "../assets/assets.jsx";
 import toast from "react-hot-toast";
 import {CheckCircle2, ChevronDown, ChevronUp, Copy, Loader2Icon} from "lucide-react";
+import {useAuth, useUser} from "@clerk/clerk-react";
+import api from "../configs/axios.js";
 
 const MyOrders = () => {
     const currency = import.meta.env.VITE_CURRENCY || "$";
+    const {user,isLoaded} = useUser()
+    const {getToken} = useAuth();
 
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [expandedId, setExpandedId] = useState(null);
 
     const fetchOrders = async () => {
-        setOrders(dummyOrders);
-        setLoading(false);
+        try{
+            setLoading(true);
+            const token=await getToken();
+            const{data}=await api.get("/api/listing/user-orders",{headers:{Authorization:`Bearer ${token}`}});
+            setOrders(data.orders);
+        }catch(error){
+            toast.error(error?.response?.data?.message||error.message);
+        }finally{
+            setLoading(false);
+        }
+
     };
 
     useEffect(() => {
+        if(user && isLoaded){
         fetchOrders();
+        }
     }, []);
 
     const mask = (val, type) => {

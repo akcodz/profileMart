@@ -2,21 +2,64 @@ import AdminTitle from '../../components/admin/AdminTitle';
 import { useEffect, useState } from 'react';
 import { CheckCircleIcon, Loader2Icon, MailCheckIcon, XIcon } from 'lucide-react';
 import ListingDetailsModal from '../../components/admin/ListingDetailsModal';
-import { dummyListings } from '../../assets/assets.jsx';
+import {useAuth} from "@clerk/clerk-react";
+import api from "../../configs/axios.js";
+import toast from "react-hot-toast";
 
 const AllListings = () => {
+    const {getToken} = useAuth();
     const [loading, setLoading] = useState(true);
     const [listings, setListings] = useState([]);
     const [showModal, setShowModal] = useState(null);
 
     const fetchAllListings = async () => {
-        setListings(dummyListings);
-        setLoading(false);
+        try {
+            const token = await getToken();
+
+            const { data } = await api.get('/api/admin/all-listings', {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            setListings(data.listings);
+            setLoading(false)
+        } catch (error) {
+            toast.error(
+                error?.response?.data?.message || error?.message || 'An unexpected error occurred'
+            );
+            console.error(error);
+        }
     };
 
+
     const changeListingStatus = async (status, listing) => {
-        setListings((prev) => [...prev.filter((l) => l.id !== listing.id), { ...listing, status }]);
+        try {
+            toast.loading('Changing status...');
+
+            const token = await getToken();
+
+            const { data } = await api.put(
+                `/api/admin/change-status/${listing.id}`,
+                { status },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+            await fetchAllListings();
+            toast.dismissAll();
+            toast.success(data.message);
+        } catch (error) {
+            toast.dismissAll();
+            toast.error(
+                error?.response?.data?.message || error?.message || 'An unexpected error occurred'
+            );
+            console.error(error);
+        }
     };
+
 
     const colorMapCredentials = {
         notSubmit: { bg: 'bg-red-100', text: 'text-red-600', icon: XIcon },

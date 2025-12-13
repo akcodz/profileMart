@@ -1,8 +1,16 @@
 import React, {useState} from 'react'
 import {X} from "lucide-react";
+import {useDispatch} from "react-redux";
+import {useAuth} from "@clerk/clerk-react";
+import toast from "react-hot-toast";
+import api from "../configs/axios.js";
+import {getAllUserListing} from "../app/features/listingSlice.js";
 
 const WithdrawModel = ({onClose}) => {
     const [amount, setAmount] = useState("");
+
+    const dispatch = useDispatch();
+    const {getToken} = useAuth()
 
     const [account, setAccount] = useState([
         { type: "text",   name: "Account Holder Name", value: "" },
@@ -15,6 +23,23 @@ const WithdrawModel = ({onClose}) => {
 
     const handleSubmission = async (e) => {
         e.preventDefault();
+        try{
+            for(const field of account){
+                if(!field.value){
+                    toast.error(`please fill ${field.name} field`);
+                }
+            }
+            const confirm=window.confirm("Please review the details before submitting. Are you sure you want to submit?");
+            if(!confirm)return;
+            const token=await getToken();
+            const{data}=await api.post("/api/listing/withdraw",{account,amount:parseInt(amount)},{headers:{Authorization:`Bearer ${token}`}});
+            toast.success(data.message);
+            dispatch(getAllUserListing({getToken}));
+            onClose();
+        }catch (error) {
+            toast.dismissAll()
+            toast.error(error.message);
+        }
     };
 
     return (

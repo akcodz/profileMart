@@ -4,8 +4,11 @@ import toast from 'react-hot-toast';
 import { ArrowUpRightFromSquareIcon, CopyIcon, Loader2Icon, XIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { dummyOrders, getProfileLink } from '../../assets/assets.jsx';
+import {useAuth} from "@clerk/clerk-react";
+import api from "../../configs/axios.js";
 
 const CredentialVerifyModal = ({ listing, onClose }) => {
+    const{getToken} = useAuth();
 
     const [loading, setLoading] = useState(true);
     const [credential, setCredential] = useState(null);
@@ -19,11 +22,52 @@ const CredentialVerifyModal = ({ listing, onClose }) => {
     };
 
     const fetchCredential = async () => {
-        setCredential(dummyOrders[0].credential)
-        setLoading(false);
+        try {
+            const token = await getToken();
+
+            const { data } = await api.get(
+                `/api/admin/credential/${listing.id}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            setCredential(data.credential);
+            setLoading(false);
+        } catch (error) {
+            toast.error(
+                error?.response?.data?.message || error?.message || 'An unexpected error occurred'
+            );
+            console.error(error);
+            setLoading(false);
+        }
     };
 
+
     const verifyCredential = async () => {
+        try {
+            const token = await getToken();
+
+            const { data } = await api.put(
+                `/api/admin/verify-credential/${listing.id}`,{},
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            toast.success(data.message);
+            onClose();
+        } catch (error) {
+            toast.error(
+                error?.response?.data?.message || error?.message || 'An unexpected error occurred'
+            );
+            console.error(error);
+            setLoading(false);
+        }
 
     };
 
