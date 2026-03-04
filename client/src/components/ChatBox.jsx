@@ -26,7 +26,8 @@ const ChatBox = () => {
         try{
             const token=await getToken();
             const{data}=await api.post("/api/chat",{listingId:listing.id,chatId}, {headers:{Authorization:`Bearer ${token}`}});
-            setChat(data?.chat?.messages||[]);
+            setChat(data?.chat);
+            setMessages(data?.chat?.messages||[])
             setIsLoading(false);
         }catch(error){
             toast.error(error?.response?.data?.message||error.message);
